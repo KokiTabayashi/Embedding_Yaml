@@ -16,15 +16,5 @@ Resources:
       TemplateURL: https://my-cloudformation-s3-bucket-2023-0901.s3.us-west-1.amazonaws.com/cf-ec2-frontend-elb.yaml
       Parameters:
         VPC: !GetAtt VPCStack.Outputs.VPC
-        Subnets: !GetAtt VPCStack.Outputs.PrivateSubnets
-        EC2InstanceProfile: !GetAtt IAMStackEC2S3Role.Outputs.EC2InstanceProfile
-
-  ELBStackEc2FrontProxy:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: https://my-cloudformation-s3-bucket-2023-0901.s3.us-west-1.amazonaws.com/cf-ec2-front-proxy-elb.yaml
-      Parameters:
-        VPC: !GetAtt VPCStack.Outputs.VPC
         Subnets: !GetAtt VPCStack.Outputs.PublicSubnets
         EC2InstanceProfile: !GetAtt IAMStackEC2S3Role.Outputs.EC2InstanceProfile
-        FrontAlbDnsName: !GetAtt ELBStackEc2Frontend.Outputs.FrontAlbDnsName

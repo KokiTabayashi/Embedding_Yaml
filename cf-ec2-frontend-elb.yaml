@@ -40,6 +40,10 @@ Resources:
       VpcId: !Ref VPC
       SecurityGroupIngress:
       - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
         FromPort: 8080
         ToPort: 8080
         CidrIp: 0.0.0.0/0
@@ -62,7 +66,7 @@ Resources:
         ToPort: 22
         CidrIp: 0.0.0.0/0
 
-  EC2FrontendTargetGroup:
+  EC2FrontendTargetGroup1:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       HealthCheckIntervalSeconds: 30
@@ -71,7 +75,25 @@ Resources:
       HealthyThresholdCount: 5
       Matcher:
         HttpCode: '200'
-      Name: EC2FrontendTargetGroup
+      Name: EC2FrontendTargetGroup1
+      Port: 80
+      Protocol: HTTP
+      TargetGroupAttributes:
+      - Key: deregistration_delay.timeout_seconds
+        Value: '20'
+      UnhealthyThresholdCount: 3
+      VpcId: !Ref VPC
+
+  EC2FrontendTargetGroup2:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 15
+      HealthyThresholdCount: 5
+      Matcher:
+        HttpCode: '200'
+      Name: EC2FrontendTargetGroup2
       Port: 8080
       Protocol: HTTP
       TargetGroupAttributes:
@@ -80,12 +102,29 @@ Resources:
       UnhealthyThresholdCount: 3
       VpcId: !Ref VPC
 
-  ALBListener:
+  ALBListener1:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Protocol: "HTTP"
+            Port: 8080
+            Host: "#{host}"
+            Path: "/#{path}"
+            Query: "#{query}"
+            StatusCode: "HTTP_301"
+          # TargetGroupArn: !Ref EC2FrontendTargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  ALBListener2:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
         - Type: forward
-          TargetGroupArn: !Ref EC2FrontendTargetGroup
+          TargetGroupArn: !Ref EC2FrontendTargetGroup2
       LoadBalancerArn: !Ref ApplicationLoadBalancer
       Port: 8080
       Protocol: HTTP
@@ -142,8 +181,7 @@ Resources:
       NotificationConfigurations:
         - TopicARN: !Ref NotificationTopic
           NotificationTypes: ['autoscaling:EC2_INSTANCE_LAUNCH', 'autoscaling:EC2_INSTANCE_LAUNCH_ERROR', 'autoscaling:EC2_INSTANCE_TERMINATE', 'autoscaling:EC2_INSTANCE_TERMINATE_ERROR']
-      TargetGroupARNs:
-        - !Ref EC2FrontendTargetGroup
+      TargetGroupARNs: [!Ref EC2FrontendTargetGroup1, !Ref EC2FrontendTargetGroup2]
       VPCZoneIdentifier: !Ref Subnets
 
 Outputs:
