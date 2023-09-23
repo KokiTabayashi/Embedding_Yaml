@@ -15,26 +15,36 @@ Resources:
     Properties:
       TemplateURL: https://my-cloudformation-s3-bucket-2023-0901.s3.us-west-1.amazonaws.com/cf-ec2-backend.yaml
       Parameters:
-        PublicSubnet2: !GetAtt VPCStack.Outputs.PublicSubnet2
+        PrivateSubnet2: !GetAtt VPCStack.Outputs.PrivateSubnet2
         BackSecurityGroup: !GetAtt VPCStack.Outputs.BackSecurityGroup
         EC2InstanceProfile: !GetAtt IAMStackEC2S3Role.Outputs.EC2InstanceProfile
-    
+
+  EC2StackProxyBack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://my-cloudformation-s3-bucket-2023-0901.s3.us-west-1.amazonaws.com/cf-ec2-proxy-back.yaml
+      Parameters:
+        PublicSubnet2: !GetAtt VPCStack.Outputs.PublicSubnet2
+        ProxySecurityGroup: !GetAtt VPCStack.Outputs.ProxySecurityGroup
+        EC2InstanceProfile: !GetAtt IAMStackEC2S3Role.Outputs.EC2InstanceProfile
+        BackEC2PrivateDNS: !GetAtt EC2StackBack.Outputs.BackEC2PrivateDNS
+
   EC2StackFront:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: https://my-cloudformation-s3-bucket-2023-0901.s3.us-west-1.amazonaws.com/cf-ec2-frontend.yaml
       Parameters:
-        PublicSubnet2: !GetAtt VPCStack.Outputs.PublicSubnet2
+        PrivateSubnet1: !GetAtt VPCStack.Outputs.PrivateSubnet1
         FrontSecurityGroup: !GetAtt VPCStack.Outputs.FrontSecurityGroup
         EC2InstanceProfile: !GetAtt IAMStackEC2S3Role.Outputs.EC2InstanceProfile
-        BackEC2PublicDNS: !GetAtt EC2StackBack.Outputs.BackEC2PublicDNS
+        ProxyBackEC2PublicDNS: !GetAtt EC2StackProxyBack.Outputs.ProxyBackEC2PublicDNS
 
-  EC2StackProxy:
+  EC2StackProxyFront:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://my-cloudformation-s3-bucket-2023-0901.s3.us-west-1.amazonaws.com/cf-ec2-proxy.yaml
+      TemplateURL: https://my-cloudformation-s3-bucket-2023-0901.s3.us-west-1.amazonaws.com/cf-ec2-proxy-front.yaml
       Parameters:
         PublicSubnet1: !GetAtt VPCStack.Outputs.PublicSubnet1
         ProxySecurityGroup: !GetAtt VPCStack.Outputs.ProxySecurityGroup
         EC2InstanceProfile: !GetAtt IAMStackEC2S3Role.Outputs.EC2InstanceProfile
-        FrontEC2PublicDNS: !GetAtt EC2StackFront.Outputs.FrontEC2PublicDNS
+        FrontEC2PrivateDNS: !GetAtt EC2StackFront.Outputs.FrontEC2PrivateDNS

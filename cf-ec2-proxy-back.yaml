@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Parameters:
-  PublicSubnet1:
+  PublicSubnet2:
     Type: String
   ProxySecurityGroup:
     Type: String
@@ -11,9 +11,12 @@ Parameters:
     Type: String
   ProxyEC2InstanceName:
     Type: String
-    Default: ProxyEC2InstanceName
-  FrontEC2PublicDNS:
+    Default: BackProxyEC2Instance
+  BackEC2PrivateDNS:
     Type: String
+  BackEC2Port:
+    Type: String
+    Default: 5001
 
 Resources:
   ProxyEC2Instance:
@@ -21,7 +24,7 @@ Resources:
     Properties:
       ImageId: ami-032d7402806156fc7
       InstanceType: t2.micro
-      SubnetId: !Ref PublicSubnet1
+      SubnetId: !Ref PublicSubnet2
       SecurityGroupIds:
         - !Ref ProxySecurityGroup
       KeyName: !Ref MyKeyName
@@ -33,11 +36,12 @@ Resources:
         Fn::Base64: !Sub
           - |
             #!/bin/bash
-            sed -i 's|ORIGIN_SERVER_NAME|${FrontEC2PublicDNS}|g' /etc/nginx/nginx.conf
-            sed -i 's|ORIGIN_PROXY_PASS|http://${FrontEC2PublicDNS}|g' /etc/nginx/nginx.conf
-            sed -i 's|ORIGIN_SERVER_PORT|8080|g' /etc/nginx/nginx.conf
+            sed -i 's|ORIGIN_SERVER_NAME|${BackEC2PrivateDNS}|g' /etc/nginx/nginx.conf
+            sed -i 's|ORIGIN_PROXY_PASS|http://${BackEC2PrivateDNS}|g' /etc/nginx/nginx.conf
+            sed -i 's|ORIGIN_SERVER_PORT|${BackEC2Port}|g' /etc/nginx/nginx.conf
             service nginx start
-          - FrontEC2PublicDNS: !Ref FrontEC2PublicDNS
+          - BackEC2PrivateDNS: !Ref BackEC2PrivateDNS
+            BackEC2Port: !Ref BackEC2Port
 
   ProxyEIPAssociation:
     Type: AWS::EC2::EIPAssociation
@@ -58,4 +62,6 @@ Outputs:
   ProxyEIP:
     Description: A reference to the created ProxyEIP
     Value: !Ref ProxyEIP 
+  ProxyBackEC2PublicDNS:
+    Value: !GetAtt ProxyEC2Instance.PublicDnsName
   

@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Parameters:
-  PublicSubnet2:
+  PrivateSubnet1:
     Type: String
   FrontSecurityGroup:
     Type: String
@@ -12,7 +12,7 @@ Parameters:
   FrontEC2InstanceName:
     Type: String
     Default: FrontEC2Instance
-  BackEC2PublicDNS:
+  ProxyBackEC2PublicDNS:
     Type: String
 
 Resources:
@@ -21,7 +21,7 @@ Resources:
     Properties:
       ImageId: ami-0bd642e343e80eced
       InstanceType: t2.micro
-      SubnetId: !Ref PublicSubnet2
+      SubnetId: !Ref PrivateSubnet1
       SecurityGroupIds:
         - !Ref FrontSecurityGroup
       KeyName: !Ref MyKeyName
@@ -37,30 +37,16 @@ Resources:
             su ec2-user -c 'cd /home/ec2-user; unzip -o frontend.zip'
             su ec2-user -c 'aws s3 cp s3://webapp-embedding-2023-0904/frontend_env /home/ec2-user/frontend/.env'
             su ec2-user -c 'aws s3 cp s3://webapp-embedding-2023-0904/frontend-react-app_env /home/ec2-user/frontend/frontend-react-app/.env'
-            echo "REACT_APP_ADDRESS_BACKEND=${BackEC2PublicDNS}" >> /home/ec2-user/frontend/frontend-react-app/.env
+            echo "REACT_APP_ADDRESS_BACKEND=${ProxyBackEC2PublicDNS}" >> /home/ec2-user/frontend/frontend-react-app/.env
+            sed -i 's|REACT_APP_PORT_BACKEND=5001|REACT_APP_PORT_BACKEND=80|g' /home/ec2-user/frontend/frontend-react-app/.env
             su ec2-user -c 'cd /home/ec2-user/frontend/frontend-react-app; npm run build'
             su ec2-user -c 'sleep 5; pm2 start /home/ec2-user/frontend/frontend_node.js'
-          - BackEC2PublicDNS: !Ref BackEC2PublicDNS
-
-  FrontEIPAssociation:
-    Type: AWS::EC2::EIPAssociation
-    Properties:
-      EIP: !Ref FrontEIP
-      InstanceId: !Ref FrontEC2Instance
-
-  FrontEIP:
-    Type: AWS::EC2::EIP
+          - ProxyBackEC2PublicDNS: !Ref ProxyBackEC2PublicDNS
 
 Outputs:
   FrontEC2Instance:
     Description: A reference to the created FrontEC2Instance
     Value: !Ref FrontEC2Instance
-  FrontEIPAssociation:
-    Description: A reference to the created FrontEIPAssociation
-    Value: !Ref FrontEIPAssociation
-  FrontEIP:
-    Description: A reference to the created FrontEIP
-    Value: !Ref FrontEIP 
-  FrontEC2PublicDNS:
-    Value: !GetAtt FrontEC2Instance.PublicDnsName
+  FrontEC2PrivateDNS:
+    Value: !GetAtt FrontEC2Instance.PrivateDnsName
   
