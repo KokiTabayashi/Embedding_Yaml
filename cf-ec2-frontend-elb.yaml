@@ -15,7 +15,7 @@ Parameters:
   LatestAmiId:
     Description: The latest Amazon Linux 2 AMI from the Parameter Store
     Type: String
-    Default: ami-032d7402806156fc7
+    Default: ami-0bd642e343e80eced
   OperatorEmail:
     Description: The email address to notify when there are any scaling activities
     Type: String
@@ -28,17 +28,20 @@ Parameters:
     Description: A virtual private cloud (VPC) that enables resources in public subnets to connect to the internet
   EC2InstanceProfile:
     Type: String
+  ProxyBackEC2PublicDNS:
+    Type: String
+    Default: Testvalue
 
 Resources:
-  ELBSecurityGroup:
+  ELBFrontendSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: ELB Security Group
       VpcId: !Ref VPC
       SecurityGroupIngress:
       - IpProtocol: tcp
-        FromPort: 80
-        ToPort: 80
+        FromPort: 8080
+        ToPort: 8080
         CidrIp: 0.0.0.0/0
 
   EC2SecurityGroup:
@@ -48,18 +51,18 @@ Resources:
       VpcId: !Ref VPC
       SecurityGroupIngress:
       - IpProtocol: tcp
-        FromPort: 80
-        ToPort: 80
+        FromPort: 8080
+        ToPort: 8080
         SourceSecurityGroupId:
           Fn::GetAtt:
-          - ELBSecurityGroup
+          - ELBFrontendSecurityGroup
           - GroupId
       - IpProtocol: tcp
         FromPort: 22
         ToPort: 22
         CidrIp: 0.0.0.0/0
 
-  EC2TargetGroup:
+  EC2FrontendTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       HealthCheckIntervalSeconds: 30
@@ -68,8 +71,8 @@ Resources:
       HealthyThresholdCount: 5
       Matcher:
         HttpCode: '200'
-      Name: EC2TargetGroup
-      Port: 80
+      Name: EC2FrontendTargetGroup
+      Port: 8080
       Protocol: HTTP
       TargetGroupAttributes:
       - Key: deregistration_delay.timeout_seconds
@@ -82,9 +85,9 @@ Resources:
     Properties:
       DefaultActions:
         - Type: forward
-          TargetGroupArn: !Ref EC2TargetGroup
+          TargetGroupArn: !Ref EC2FrontendTargetGroup
       LoadBalancerArn: !Ref ApplicationLoadBalancer
-      Port: 80
+      Port: 8080
       Protocol: HTTP
 
   ApplicationLoadBalancer:
@@ -93,7 +96,7 @@ Resources:
       Scheme: internet-facing
       Subnets: !Ref Subnets
       SecurityGroups:
-        - !GetAtt ELBSecurityGroup.GroupId
+        - !GetAtt ELBFrontendSecurityGroup.GroupId
 
   LaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
@@ -105,17 +108,21 @@ Resources:
         KeyName: !Ref KeyName
         SecurityGroupIds: 
           - !Ref EC2SecurityGroup
-        IamInstanceProfile: !Ref EC2InstanceProfile
-        # UserData:
-        #   Fn::Base64: !Sub
-        #     - |
-        #       #!/bin/bash
-        #       sed -i 's|ORIGIN_SERVER_NAME|${FrontEC2PrivateDNS}|g' /etc/nginx/nginx.conf
-        #       sed -i 's|ORIGIN_PROXY_PASS|http://${FrontEC2PrivateDNS}|g' /etc/nginx/nginx.conf
-        #       sed -i 's|ORIGIN_SERVER_PORT|${FrontEC2Port}|g' /etc/nginx/nginx.conf
-        #       service nginx start
-        #     - FrontEC2PrivateDNS: !Ref FrontEC2PrivateDNS
-        #       FrontEC2Port: !Ref FrontEC2Port
+        IamInstanceProfile: 
+          Name: !Ref EC2InstanceProfile
+        UserData:
+          Fn::Base64: !Sub
+            - |
+              #!/bin/bash
+              su ec2-user -c 'aws s3 cp s3://webapp-embedding-2023-0904/frontend.zip /home/ec2-user/frontend.zip'
+              su ec2-user -c 'cd /home/ec2-user; unzip -o frontend.zip'
+              su ec2-user -c 'aws s3 cp s3://webapp-embedding-2023-0904/frontend_env /home/ec2-user/frontend/.env'
+              su ec2-user -c 'aws s3 cp s3://webapp-embedding-2023-0904/frontend-react-app_env /home/ec2-user/frontend/frontend-react-app/.env'
+              echo "REACT_APP_ADDRESS_BACKEND=${ProxyBackEC2PublicDNS}" >> /home/ec2-user/frontend/frontend-react-app/.env
+              sed -i 's|REACT_APP_PORT_BACKEND=5001|REACT_APP_PORT_BACKEND=80|g' /home/ec2-user/frontend/frontend-react-app/.env
+              su ec2-user -c 'cd /home/ec2-user/frontend/frontend-react-app; npm run build'
+              su ec2-user -c 'sleep 5; pm2 start /home/ec2-user/frontend/frontend_node.js'
+            - ProxyBackEC2PublicDNS: !Ref ProxyBackEC2PublicDNS
 
   NotificationTopic:
     Type: AWS::SNS::Topic
@@ -136,5 +143,12 @@ Resources:
         - TopicARN: !Ref NotificationTopic
           NotificationTypes: ['autoscaling:EC2_INSTANCE_LAUNCH', 'autoscaling:EC2_INSTANCE_LAUNCH_ERROR', 'autoscaling:EC2_INSTANCE_TERMINATE', 'autoscaling:EC2_INSTANCE_TERMINATE_ERROR']
       TargetGroupARNs:
-        - !Ref EC2TargetGroup
+        - !Ref EC2FrontendTargetGroup
       VPCZoneIdentifier: !Ref Subnets
+
+Outputs:
+  # FrontEC2Instance:
+  #   Description: A reference to the created FrontEC2Instance
+  #   Value: !Ref FrontEC2Instance
+  FrontAlbDnsName:
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
