@@ -15,36 +15,36 @@ Parameters:
   LatestAmiId:
     Description: The latest Amazon Linux 2 AMI from the Parameter Store
     Type: String
-    Default: ami-0bd642e343e80eced
+    Default: ami-030293faa878df9aa
   OperatorEmail:
     Description: The email address to notify when there are any scaling activities
     Type: String
     Default: kokitabayashi@gmail.com
-  Subnets:
+  PublicSubnets:
     Type: 'List<AWS::EC2::Subnet::Id>'
     Description: At least two public subnets in different Availability Zones in the selected VPC
+  PrivateSubnets:
+    Type: 'List<AWS::EC2::Subnet::Id>'
   VPC:
     Type: 'AWS::EC2::VPC::Id'
     Description: A virtual private cloud (VPC) that enables resources in public subnets to connect to the internet
   EC2InstanceProfile:
     Type: String
-  BackEC2ElbDns:
-    Type: String
 
 Resources:
-  ELBFrontendSecurityGroup:
+  ELBBackendSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: ELB Security Group
       VpcId: !Ref VPC
       SecurityGroupIngress:
+      # - IpProtocol: tcp
+      #   FromPort: 80
+      #   ToPort: 80
+      #   CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
-        FromPort: 80
-        ToPort: 80
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 8080
-        ToPort: 8080
+        FromPort: 5001
+        ToPort: 5001
         CidrIp: 0.0.0.0/0
 
   EC2SecurityGroup:
@@ -54,18 +54,36 @@ Resources:
       VpcId: !Ref VPC
       SecurityGroupIngress:
       - IpProtocol: tcp
-        FromPort: 8080
-        ToPort: 8080
+        FromPort: 5001
+        ToPort: 5001
         SourceSecurityGroupId:
           Fn::GetAtt:
-          - ELBFrontendSecurityGroup
+          - ELBBackendSecurityGroup
           - GroupId
       - IpProtocol: tcp
         FromPort: 22
         ToPort: 22
         CidrIp: 0.0.0.0/0
 
-  EC2FrontendTargetGroup1:
+  # EC2BackendTargetGroup1:
+  #   Type: AWS::ElasticLoadBalancingV2::TargetGroup
+  #   Properties:
+  #     HealthCheckIntervalSeconds: 30
+  #     HealthCheckProtocol: HTTP
+  #     HealthCheckTimeoutSeconds: 15
+  #     HealthyThresholdCount: 5
+  #     Matcher:
+  #       HttpCode: '200'
+  #     Name: EC2BackendTargetGroup1
+  #     Port: 80
+  #     Protocol: HTTP
+  #     TargetGroupAttributes:
+  #     - Key: deregistration_delay.timeout_seconds
+  #       Value: '20'
+  #     UnhealthyThresholdCount: 3
+  #     VpcId: !Ref VPC
+
+  EC2BackendTargetGroup2:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       HealthCheckIntervalSeconds: 30
@@ -74,67 +92,50 @@ Resources:
       HealthyThresholdCount: 5
       Matcher:
         HttpCode: '200'
-      Name: EC2FrontendTargetGroup1
-      Port: 80
+      Name: EC2BackendTargetGroup2
+      Port: 5001
       Protocol: HTTP
+      HealthCheckPath: "/api/v2/health"
       TargetGroupAttributes:
       - Key: deregistration_delay.timeout_seconds
         Value: '20'
       UnhealthyThresholdCount: 3
       VpcId: !Ref VPC
 
-  EC2FrontendTargetGroup2:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      HealthCheckIntervalSeconds: 30
-      HealthCheckProtocol: HTTP
-      HealthCheckTimeoutSeconds: 15
-      HealthyThresholdCount: 5
-      Matcher:
-        HttpCode: '200'
-      Name: EC2FrontendTargetGroup2
-      Port: 8080
-      Protocol: HTTP
-      TargetGroupAttributes:
-      - Key: deregistration_delay.timeout_seconds
-        Value: '20'
-      UnhealthyThresholdCount: 3
-      VpcId: !Ref VPC
-
-  ALBListener1:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      DefaultActions:
-        - Type: redirect
-          RedirectConfig:
-            Protocol: "HTTP"
-            Port: 8080
-            Host: "#{host}"
-            Path: "/#{path}"
-            Query: "#{query}"
-            StatusCode: "HTTP_301"
-          # TargetGroupArn: !Ref EC2FrontendTargetGroup
-      LoadBalancerArn: !Ref ApplicationLoadBalancer
-      Port: 80
-      Protocol: HTTP
+  # ALBListener1:
+  #   Type: AWS::ElasticLoadBalancingV2::Listener
+  #   Properties:
+  #     DefaultActions:
+  #       - Type: redirect
+  #         RedirectConfig:
+  #           Protocol: "HTTP"
+  #           Port: 5001
+  #           Host: "#{host}"
+  #           Path: "/#{path}"
+  #           Query: "#{query}"
+  #           StatusCode: "HTTP_301"
+  #         # TargetGroupArn: !Ref EC2FrontendTargetGroup
+  #     LoadBalancerArn: !Ref ApplicationLoadBalancer
+  #     Port: 80
+  #     Protocol: HTTP
 
   ALBListener2:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
         - Type: forward
-          TargetGroupArn: !Ref EC2FrontendTargetGroup2
+          TargetGroupArn: !Ref EC2BackendTargetGroup2
       LoadBalancerArn: !Ref ApplicationLoadBalancer
-      Port: 8080
+      Port: 5001
       Protocol: HTTP
 
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       Scheme: internet-facing
-      Subnets: !Ref Subnets
+      Subnets: !Ref PublicSubnets
       SecurityGroups:
-        - !GetAtt ELBFrontendSecurityGroup.GroupId
+        - !GetAtt ELBBackendSecurityGroup.GroupId
 
   LaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
@@ -149,18 +150,13 @@ Resources:
         IamInstanceProfile: 
           Name: !Ref EC2InstanceProfile
         UserData:
-          Fn::Base64: !Sub
-            - |
-              #!/bin/bash
-              su ec2-user -c 'aws s3 cp s3://webapp-embedding-2023-0904/frontend.zip /home/ec2-user/frontend.zip'
-              su ec2-user -c 'cd /home/ec2-user; unzip -o frontend.zip'
-              su ec2-user -c 'aws s3 cp s3://webapp-embedding-2023-0904/frontend_env /home/ec2-user/frontend/.env'
-              su ec2-user -c 'aws s3 cp s3://webapp-embedding-2023-0904/frontend-react-app_env /home/ec2-user/frontend/frontend-react-app/.env'
-              echo "REACT_APP_ADDRESS_BACKEND=${BackEC2ElbDns}" >> /home/ec2-user/frontend/frontend-react-app/.env
-              # sed -i 's|REACT_APP_PORT_BACKEND=5001|REACT_APP_PORT_BACKEND=80|g' /home/ec2-user/frontend/frontend-react-app/.env
-              su ec2-user -c 'cd /home/ec2-user/frontend/frontend-react-app; npm run build'
-              su ec2-user -c 'sleep 5; pm2 start /home/ec2-user/frontend/frontend_node.js'
-            - BackEC2ElbDns: !Ref BackEC2ElbDns
+          Fn::Base64: |
+            #!/bin/bash
+            su ec2-user -c 'mkdir /home/ec2-user/dev'
+            su ec2-user -c 'aws s3 cp s3://webapp-embedding-2023-0904/backend_elb.zip /home/ec2-user/dev/backend.zip'
+            su ec2-user -c 'cd /home/ec2-user/dev; unzip -o backend.zip'
+            su ec2-user -c 'aws s3 cp s3://webapp-embedding-2023-0904/backend_env /home/ec2-user/dev/backend/.env'
+            su ec2-user -c 'sleep 5; pm2 start /home/ec2-user/dev/backend/backend_node.js'
 
   NotificationTopic:
     Type: AWS::SNS::Topic
@@ -180,12 +176,12 @@ Resources:
       NotificationConfigurations:
         - TopicARN: !Ref NotificationTopic
           NotificationTypes: ['autoscaling:EC2_INSTANCE_LAUNCH', 'autoscaling:EC2_INSTANCE_LAUNCH_ERROR', 'autoscaling:EC2_INSTANCE_TERMINATE', 'autoscaling:EC2_INSTANCE_TERMINATE_ERROR']
-      TargetGroupARNs: [!Ref EC2FrontendTargetGroup1, !Ref EC2FrontendTargetGroup2]
-      VPCZoneIdentifier: !Ref Subnets
+      TargetGroupARNs: [!Ref EC2BackendTargetGroup2]
+      VPCZoneIdentifier: !Ref PrivateSubnets
 
 Outputs:
   # FrontEC2Instance:
   #   Description: A reference to the created FrontEC2Instance
   #   Value: !Ref FrontEC2Instance
-  FrontAlbDnsName:
+  BackEC2ElbDns:
     Value: !GetAtt ApplicationLoadBalancer.DNSName

@@ -10,6 +10,16 @@ Resources:
     Properties:
       TemplateURL: https://my-cloudformation-s3-bucket-2023-0901.s3.us-west-1.amazonaws.com/cf-vpc-elb.yaml
 
+  ELBStackEc2Backend:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://my-cloudformation-s3-bucket-2023-0901.s3.us-west-1.amazonaws.com/cf-ec2-backend-elb.yaml
+      Parameters:
+        VPC: !GetAtt VPCStack.Outputs.VPC
+        PublicSubnets: !GetAtt VPCStack.Outputs.PublicSubnets
+        PrivateSubnets: !GetAtt VPCStack.Outputs.PrivateSubnets
+        EC2InstanceProfile: !GetAtt IAMStackEC2S3Role.Outputs.EC2InstanceProfile
+
   ELBStackEc2Frontend:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -18,3 +28,4 @@ Resources:
         VPC: !GetAtt VPCStack.Outputs.VPC
         Subnets: !GetAtt VPCStack.Outputs.PublicSubnets
         EC2InstanceProfile: !GetAtt IAMStackEC2S3Role.Outputs.EC2InstanceProfile
+        BackEC2ElbDns: !GetAtt ELBStackEc2Backend.Outputs.BackEC2ElbDns
