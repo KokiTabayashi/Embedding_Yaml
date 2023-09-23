@@ -7,9 +7,10 @@ Resources:
   EC2Stack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://my-cloudformation-s3-bucket-2023-0901.s3.us-west-1.amazonaws.com/cf-ec2-org.yaml
+      TemplateURL: https://my-cloudformation-s3-bucket-2023-0901.s3.us-west-1.amazonaws.com/cf-ec2.yaml
       Parameters:
         PublicSubnet1: !GetAtt VPCStack.Outputs.PublicSubnet1
         PublicSubnet2: !GetAtt VPCStack.Outputs.PublicSubnet2
+        ProxySecurityGroup: !GetAtt VPCStack.Outputs.ProxySecurityGroup
         FrontSecurityGroup: !GetAtt VPCStack.Outputs.FrontSecurityGroup
         BackSecurityGroup: !GetAtt VPCStack.Outputs.BackSecurityGroup
