@@ -38,10 +38,6 @@ Resources:
       GroupDescription: ELB Security Group
       VpcId: !Ref VPC
       SecurityGroupIngress:
-      # - IpProtocol: tcp
-      #   FromPort: 80
-      #   ToPort: 80
-      #   CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
         FromPort: 5001
         ToPort: 5001
@@ -65,25 +61,7 @@ Resources:
         ToPort: 22
         CidrIp: 0.0.0.0/0
 
-  # EC2BackendTargetGroup1:
-  #   Type: AWS::ElasticLoadBalancingV2::TargetGroup
-  #   Properties:
-  #     HealthCheckIntervalSeconds: 30
-  #     HealthCheckProtocol: HTTP
-  #     HealthCheckTimeoutSeconds: 15
-  #     HealthyThresholdCount: 5
-  #     Matcher:
-  #       HttpCode: '200'
-  #     Name: EC2BackendTargetGroup1
-  #     Port: 80
-  #     Protocol: HTTP
-  #     TargetGroupAttributes:
-  #     - Key: deregistration_delay.timeout_seconds
-  #       Value: '20'
-  #     UnhealthyThresholdCount: 3
-  #     VpcId: !Ref VPC
-
-  EC2BackendTargetGroup2:
+  EC2BackendTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       HealthCheckIntervalSeconds: 30
@@ -92,7 +70,7 @@ Resources:
       HealthyThresholdCount: 5
       Matcher:
         HttpCode: '200'
-      Name: EC2BackendTargetGroup2
+      Name: EC2BackendTargetGroup
       Port: 5001
       Protocol: HTTP
       HealthCheckPath: "/api/v2/health"
@@ -102,29 +80,12 @@ Resources:
       UnhealthyThresholdCount: 3
       VpcId: !Ref VPC
 
-  # ALBListener1:
-  #   Type: AWS::ElasticLoadBalancingV2::Listener
-  #   Properties:
-  #     DefaultActions:
-  #       - Type: redirect
-  #         RedirectConfig:
-  #           Protocol: "HTTP"
-  #           Port: 5001
-  #           Host: "#{host}"
-  #           Path: "/#{path}"
-  #           Query: "#{query}"
-  #           StatusCode: "HTTP_301"
-  #         # TargetGroupArn: !Ref EC2FrontendTargetGroup
-  #     LoadBalancerArn: !Ref ApplicationLoadBalancer
-  #     Port: 80
-  #     Protocol: HTTP
-
-  ALBListener2:
+  ALBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
         - Type: forward
-          TargetGroupArn: !Ref EC2BackendTargetGroup2
+          TargetGroupArn: !Ref EC2BackendTargetGroup
       LoadBalancerArn: !Ref ApplicationLoadBalancer
       Port: 5001
       Protocol: HTTP
@@ -132,10 +93,14 @@ Resources:
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
+      Name: 'ElbBackend'
       Scheme: internet-facing
       Subnets: !Ref PublicSubnets
       SecurityGroups:
         - !GetAtt ELBBackendSecurityGroup.GroupId
+      Tags:
+        - Key: Name
+          Value: ElbBackend
 
   LaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
@@ -176,12 +141,9 @@ Resources:
       NotificationConfigurations:
         - TopicARN: !Ref NotificationTopic
           NotificationTypes: ['autoscaling:EC2_INSTANCE_LAUNCH', 'autoscaling:EC2_INSTANCE_LAUNCH_ERROR', 'autoscaling:EC2_INSTANCE_TERMINATE', 'autoscaling:EC2_INSTANCE_TERMINATE_ERROR']
-      TargetGroupARNs: [!Ref EC2BackendTargetGroup2]
+      TargetGroupARNs: [!Ref EC2BackendTargetGroup]
       VPCZoneIdentifier: !Ref PrivateSubnets
 
 Outputs:
-  # FrontEC2Instance:
-  #   Description: A reference to the created FrontEC2Instance
-  #   Value: !Ref FrontEC2Instance
   BackEC2ElbDns:
     Value: !GetAtt ApplicationLoadBalancer.DNSName
