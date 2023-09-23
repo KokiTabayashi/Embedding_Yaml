@@ -154,7 +154,6 @@ Resources:
       RouteTableId: !Ref PublicRouteTable
       SubnetId: !Ref PublicSubnet2
 
-
   PrivateRouteTable1:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -251,6 +250,60 @@ Resources:
         FromPort: 5001
         IpProtocol: tcp
         ToPort: 5001
+
+  S3GatewayEndpointPublic:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Gateway
+      VpcId: !Ref VPC
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action:
+              - 's3:GetObject'
+            Resource:
+              - 'arn:aws:s3:::webapp-embedding-2023-0904/*'
+      RouteTableIds:
+        - !Ref PublicRouteTable
+
+  S3GatewayEndpointPrivate1:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Gateway
+      VpcId: !Ref VPC
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action:
+              - 's3:GetObject'
+            Resource:
+              - 'arn:aws:s3:::webapp-embedding-2023-0904/*'
+      RouteTableIds:
+        - !Ref PrivateRouteTable1
+
+  S3GatewayEndpointPrivate2:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Gateway
+      VpcId: !Ref VPC
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action:
+              - 's3:GetObject'
+            Resource:
+              - 'arn:aws:s3:::webapp-embedding-2023-0904/*'
+      RouteTableIds:
+        - !Ref PrivateRouteTable2
 
 Outputs:
   VPC:
