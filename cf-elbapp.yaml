@@ -1,0 +1,21 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  IAMStackEC2S3Role:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://my-cloudformation-s3-bucket-2023-0901.s3.us-west-1.amazonaws.com/cf-role-ec2-s3-elb.yaml
+
+  VPCStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://my-cloudformation-s3-bucket-2023-0901.s3.us-west-1.amazonaws.com/cf-vpc-elb.yaml
+
+  ELBStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://my-cloudformation-s3-bucket-2023-0901.s3.us-west-1.amazonaws.com/cf-elb.yaml
+      Parameters:
+        VPC: !GetAtt VPCStack.Outputs.VPC
+        Subnets: !GetAtt VPCStack.Outputs.PublicSubnets
+        EC2InstanceProfile: !GetAtt IAMStackEC2S3Role.Outputs.EC2InstanceProfile
+
