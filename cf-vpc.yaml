@@ -226,11 +226,11 @@ Resources:
       GroupDescription: "Security group with port 22 and port 8080"
       VpcId: !Ref VPC
       SecurityGroupIngress:
-      - CidrIp: 0.0.0.0/0
+      - SourceSecurityGroupId: !Ref ProxySecurityGroup
         FromPort: 22
         IpProtocol: tcp
         ToPort: 22
-      - CidrIp: 0.0.0.0/0
+      - SourceSecurityGroupId: !Ref ProxySecurityGroup
         FromPort: 8080
         IpProtocol: tcp
         ToPort: 8080
@@ -242,11 +242,11 @@ Resources:
       GroupDescription: "Security group with port 22 and 5001"
       VpcId: !Ref VPC
       SecurityGroupIngress:
-      - CidrIp: 0.0.0.0/0
+      - SourceSecurityGroupId: !Ref ProxySecurityGroup
         FromPort: 22
         IpProtocol: tcp
         ToPort: 22
-      - CidrIp: 0.0.0.0/0
+      - SourceSecurityGroupId: !Ref ProxySecurityGroup
         FromPort: 5001
         IpProtocol: tcp
         ToPort: 5001
