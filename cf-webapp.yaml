@@ -4,13 +4,37 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: https://my-cloudformation-s3-bucket-2023-0901.s3.us-west-1.amazonaws.com/cf-vpc.yaml
-  EC2Stack:
+  
+  IAMStackEC2S3Role:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://my-cloudformation-s3-bucket-2023-0901.s3.us-west-1.amazonaws.com/cf-ec2.yaml
+      TemplateURL: https://my-cloudformation-s3-bucket-2023-0901.s3.us-west-1.amazonaws.com/cf-role-ec2-s3.yaml
+
+  EC2StackBack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://my-cloudformation-s3-bucket-2023-0901.s3.us-west-1.amazonaws.com/cf-ec2-backend.yaml
+      Parameters:
+        PublicSubnet2: !GetAtt VPCStack.Outputs.PublicSubnet2
+        BackSecurityGroup: !GetAtt VPCStack.Outputs.BackSecurityGroup
+        EC2InstanceProfile: !GetAtt IAMStackEC2S3Role.Outputs.EC2InstanceProfile
+    
+  EC2StackFront:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://my-cloudformation-s3-bucket-2023-0901.s3.us-west-1.amazonaws.com/cf-ec2-frontend.yaml
+      Parameters:
+        PublicSubnet2: !GetAtt VPCStack.Outputs.PublicSubnet2
+        FrontSecurityGroup: !GetAtt VPCStack.Outputs.FrontSecurityGroup
+        EC2InstanceProfile: !GetAtt IAMStackEC2S3Role.Outputs.EC2InstanceProfile
+        BackEC2PublicDNS: !GetAtt EC2StackBack.Outputs.BackEC2PublicDNS
+
+  EC2StackProxy:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://my-cloudformation-s3-bucket-2023-0901.s3.us-west-1.amazonaws.com/cf-ec2-proxy.yaml
       Parameters:
         PublicSubnet1: !GetAtt VPCStack.Outputs.PublicSubnet1
-        PublicSubnet2: !GetAtt VPCStack.Outputs.PublicSubnet2
         ProxySecurityGroup: !GetAtt VPCStack.Outputs.ProxySecurityGroup
-        FrontSecurityGroup: !GetAtt VPCStack.Outputs.FrontSecurityGroup
-        BackSecurityGroup: !GetAtt VPCStack.Outputs.BackSecurityGroup
+        EC2InstanceProfile: !GetAtt IAMStackEC2S3Role.Outputs.EC2InstanceProfile
+        FrontEC2PublicDNS: !GetAtt EC2StackFront.Outputs.FrontEC2PublicDNS

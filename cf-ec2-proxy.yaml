@@ -1,0 +1,61 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  PublicSubnet1:
+    Type: String
+  ProxySecurityGroup:
+    Type: String
+  MyKeyName:
+    Type: String
+    Default: cf_aws_key
+  EC2InstanceProfile:
+    Type: String
+  ProxyEC2InstanceName:
+    Type: String
+    Default: ProxyEC2InstanceName
+  FrontEC2PublicDNS:
+    Type: String
+
+Resources:
+  ProxyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-032d7402806156fc7
+      InstanceType: t2.micro
+      SubnetId: !Ref PublicSubnet1
+      SecurityGroupIds:
+        - !Ref ProxySecurityGroup
+      KeyName: !Ref MyKeyName
+      Tags:
+        - Key: Name
+          Value: !Ref ProxyEC2InstanceName
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      UserData:
+        Fn::Base64: !Sub
+          - |
+            #!/bin/bash
+            sed -i 's|ORIGIN_SERVER_NAME|${FrontEC2PublicDNS}|g' /etc/nginx/nginx.conf
+            sed -i 's|ORIGIN_PROXY_PASS|http://${FrontEC2PublicDNS}|g' /etc/nginx/nginx.conf
+            sed -i 's|ORIGIN_SERVER_PORT|8080|g' /etc/nginx/nginx.conf
+            service nginx start
+          - FrontEC2PublicDNS: !Ref FrontEC2PublicDNS
+
+  ProxyEIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      EIP: !Ref ProxyEIP
+      InstanceId: !Ref ProxyEC2Instance
+
+  ProxyEIP:
+    Type: AWS::EC2::EIP
+
+Outputs:
+  ProxyEC2Instance:
+    Description: A reference to the created ProxyEC2Instance
+    Value: !Ref ProxyEC2Instance
+  ProxyEIPAssociation:
+    Description: A reference to the created ProxyEIPAssociation
+    Value: !Ref ProxyEIPAssociation
+  ProxyEIP:
+    Description: A reference to the created ProxyEIP
+    Value: !Ref ProxyEIP 
+  

@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: Ec2InstanceProfile
+      Path: /
+      Roles:
+        - !Ref EC2InstanceS3Role
+
+  EC2InstanceS3Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: RoleEc2ReadS3
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+
+  EC2InstanceS3Policy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: PolicyS3ReadOnly
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Action:
+              - s3:Get*
+              - s3:List*
+              - s3:Describe*
+              - s3-object-lambda:Get*
+              - s3-object-lambda:List*
+            Resource:
+              - '*'
+      Roles:
+        -
+          !Ref EC2InstanceS3Role
+
+Outputs:
+  EC2InstanceProfile:
+    Description: A reference to the created EC2InstanceProfile
+    Value: !Ref EC2InstanceProfile
+  

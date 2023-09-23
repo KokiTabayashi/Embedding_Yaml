@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  PublicSubnet2:
+    Type: String
+  BackSecurityGroup:
+    Type: String
+  MyKeyName:
+    Type: String
+    Default: cf_aws_key
+  EC2InstanceProfile:
+    Type: String
+  BackEC2InstanceName:
+    Type: String
+    Default: BackEC2Instance
+
+Resources:
+  BackEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-030293faa878df9aa
+      InstanceType: t2.micro
+      SubnetId: !Ref PublicSubnet2
+      SecurityGroupIds:
+        - !Ref BackSecurityGroup
+      KeyName: !Ref MyKeyName
+      Tags:
+        - Key: Name
+          Value: !Ref BackEC2InstanceName
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          su ec2-user -c 'mkdir /home/ec2-user/dev'
+          su ec2-user -c 'aws s3 cp s3://webapp-embedding-2023-0904/backend.zip /home/ec2-user/dev/backend.zip'
+          su ec2-user -c 'cd /home/ec2-user/dev; unzip -o backend.zip'
+          su ec2-user -c 'aws s3 cp s3://webapp-embedding-2023-0904/backend_env /home/ec2-user/dev/backend/.env'
+          su ec2-user -c 'sleep 5; pm2 start /home/ec2-user/dev/backend/backend_node.js'
+
+  BackEIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      EIP: !Ref BackEIP
+      InstanceId: !Ref BackEC2Instance
+
+  BackEIP:
+    Type: AWS::EC2::EIP
+
+Outputs:
+  BackEC2Instance:
+    Description: A reference to the created BackEC2Instance
+    Value: !Ref BackEC2Instance
+  BackEIPAssociation:
+    Description: A reference to the created BackEIPAssociation
+    Value: !Ref BackEIPAssociation
+  BackEIP:
+    Description: A reference to the created BackEIP
+    Value: !Ref BackEIP 
+  BackEC2PublicDNS:
+    Value: !GetAtt BackEC2Instance.PublicDnsName
+  
